@@ -60,9 +60,16 @@ export default function CameraScanner({ onCapture, onClose }: CameraScannerProps
     if (ctx) {
       ctx.drawImage(videoRef.current, 0, 0);
       const imageData = canvas.toDataURL('image/jpeg');
-      onCapture(imageData);
+      
+      // Simulate "Flash" effect
+      const flash = document.createElement('div');
+      flash.className = 'fixed inset-0 bg-white z-[100]';
+      document.body.appendChild(flash);
+      setTimeout(() => {
+        document.body.removeChild(flash);
+        onCapture(imageData);
+      }, 100);
     }
-    setIsCapturing(false);
   };
 
   return (

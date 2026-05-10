@@ -53,6 +53,39 @@
         "userId": { "type": "string", "description": "Owner of the custom category. Null for system defaults." }
       },
       "required": ["name"]
+    },
+    "Statement": {
+      "title": "Bank Statement",
+      "description": "A monthly bank statement digest.",
+      "type": "object",
+      "properties": {
+        "userId": { "type": "string" },
+        "householdId": { "type": "string" },
+        "startDate": { "type": "string" },
+        "endDate": { "type": "string" },
+        "totalDebit": { "type": "number" },
+        "totalCredit": { "type": "number" },
+        "createdAt": { "type": "string" }
+      },
+      "required": ["userId", "startDate", "endDate"]
+    },
+    "BankTransaction": {
+      "title": "Bank Transaction",
+      "description": "An individual line item from a bank statement.",
+      "type": "object",
+      "properties": {
+        "statementId": { "type": "string" },
+        "userId": { "type": "string" },
+        "householdId": { "type": "string" },
+        "date": { "type": "string" },
+        "merchant": { "type": "string" },
+        "amount": { "type": "number" },
+        "type": { "type": "string", "enum": ["debit", "credit"] },
+        "category": { "type": "string" },
+        "isLinkedToReceipt": { "type": "boolean" },
+        "linkedReceiptId": { "type": "string" }
+      },
+      "required": ["userId", "date", "merchant", "amount", "type"]
     }
   },
   "firestore": {
@@ -71,6 +104,14 @@
     "categories": {
       "schema": "Category",
       "description": "Master list of categories."
+    },
+    "statements": {
+      "schema": "Statement",
+      "description": "Uploaded bank statement records."
+    },
+    "bank_transactions": {
+      "schema": "BankTransaction",
+      "description": "Individual transactions from bank statements."
     }
   }
 }

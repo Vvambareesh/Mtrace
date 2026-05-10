@@ -57,5 +57,26 @@ service cloud.firestore {
       allow read: if isSignedIn() && (resource.data.userId == null || resource.data.userId == request.auth.uid);
       allow create: if isSignedIn() && request.resource.data.userId == request.auth.uid;
     }
+    
+    match /statements/{statementId} {
+      allow list, get: if isSignedIn() && (
+        resource.data.userId == request.auth.uid || 
+        (resource.data.householdId != null && resource.data.householdId == getUserHousehold())
+      );
+      allow create: if isSignedIn() && request.resource.data.userId == request.auth.uid;
+      allow delete: if isSignedIn() && resource.data.userId == request.auth.uid;
+    }
+
+    match /bank_transactions/{transactionId} {
+      allow list, get: if isSignedIn() && (
+        resource.data.userId == request.auth.uid || 
+        (resource.data.householdId != null && resource.data.householdId == getUserHousehold())
+      );
+      allow create: if isSignedIn() && request.resource.data.userId == request.auth.uid;
+      allow update: if isSignedIn() && (
+        resource.data.userId == request.auth.uid || 
+        (resource.data.householdId != null && resource.data.householdId == getUserHousehold())
+      );
+    }
   }
 }

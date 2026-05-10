@@ -1,4 +1,4 @@
-import { Home, Receipt, PieChart, Settings, ScanLine } from 'lucide-react';
+import { Home, Receipt, FileCheck, Settings, ScanLine } from 'lucide-react';
 
 interface BottomNavProps {
   activeTab: string;
@@ -10,7 +10,7 @@ export default function BottomNav({ activeTab, onTabChange, onScanClick }: Botto
   const tabs = [
     { id: 'home', icon: Home, label: 'Home' },
     { id: 'expenses', icon: Receipt, label: 'History' },
-    { id: 'stats', icon: PieChart, label: 'Stats' },
+    { id: 'reconcile', icon: FileCheck, label: 'Audit' },
     { id: 'settings', icon: Settings, label: 'Settings' },
   ];
 

@@ -59,6 +59,14 @@ export default function ReceiptReview({ receipt, onSave, onCancel }: ReceiptRevi
     .filter((_, i) => selectedItems.has(i))
     .reduce((sum, item) => sum + (Number(item.price) || 0), 0);
 
+  // Group items by category
+  const groupedItems: Record<string, (ReceiptItem & { originalIndex: number })[]> = items.reduce((acc, item, index) => {
+    const cat = item.category || 'Other';
+    if (!acc[cat]) acc[cat] = [];
+    acc[cat].push({ ...item, originalIndex: index });
+    return acc;
+  }, {} as Record<string, (ReceiptItem & { originalIndex: number })[]>);
+
   const handleSave = () => {
     const finalItems = items
       .filter((_, i) => selectedItems.has(i))
@@ -75,8 +83,18 @@ export default function ReceiptReview({ receipt, onSave, onCancel }: ReceiptRevi
   const getCategoryIcon = (category?: string) => {
     const cat = category?.toLowerCase() || '';
     if (cat.includes('fruit')) return <Apple size={14} className="text-red-500" />;
-    if (cat.includes('veg')) return <Salad size={14} className="text-green-500" />;
+    if (cat.includes('veg')) return <Salad size={14} className="text-emerald-500" />;
+    if (cat.includes('alcohol') || cat.includes('drink')) return <Tag size={14} className="text-purple-500" />;
+    if (cat.includes('meat') || cat.includes('dairy')) return <Tag size={14} className="text-orange-500" />;
     return <Tag size={14} className="text-blue-500" />;
+  };
+
+  const getCategoryColor = (category?: string) => {
+    const cat = category?.toLowerCase() || '';
+    if (cat.includes('fruit')) return 'bg-red-50 border-red-100';
+    if (cat.includes('veg')) return 'bg-emerald-50 border-emerald-100';
+    if (cat.includes('drink') || cat.includes('alcohol')) return 'bg-purple-50 border-purple-100';
+    return 'bg-gray-50 border-gray-100';
   };
 
   return (
@@ -126,66 +144,74 @@ export default function ReceiptReview({ receipt, onSave, onCancel }: ReceiptRevi
             </span>
           </div>
 
-          <div className="space-y-3">
-            {items.map((item, index) => (
-              <motion.div 
-                key={index}
-                layout
-                className={`p-4 rounded-2xl border transition-all ${
-                  selectedItems.has(index) 
-                    ? 'bg-white border-blue-100 shadow-sm' 
-                    : 'bg-gray-50 border-transparent opacity-60'
-                }`}
-              >
-                <div className="flex items-start justify-between">
-                  <div className="flex space-x-3 flex-1">
-                    <button 
-                      onClick={() => toggleItem(index)}
-                      className={`mt-0.5 w-5 h-5 rounded-md flex items-center justify-center transition-colors ${
-                        selectedItems.has(index) ? 'bg-blue-600 text-white' : 'border-2 border-gray-200'
-                      }`}
-                    >
-                      {selectedItems.has(index) && <Check size={14} />}
-                    </button>
-                    <div className="flex-1 min-w-0">
-                      <input 
-                        value={item.name}
-                        onChange={(e) => updateItem(index, 'name', e.target.value)}
-                        className={`w-full font-bold text-sm bg-transparent border-none p-0 focus:ring-0 focus:outline-none transition-colors ${
-                           selectedItems.has(index) ? 'text-gray-900' : 'text-gray-400'
-                        }`}
-                        placeholder="Item name"
-                      />
-                      <div className="flex items-center space-x-2 mt-1">
-                        <div className="flex items-center space-x-1 px-2 py-0.5 bg-gray-100 rounded-lg max-w-fit">
-                           {getCategoryIcon(item.category)}
-                           <span className="text-[9px] font-bold text-gray-500 uppercase truncate">
-                              {item.category || 'Item'} {item.subcategory ? `• ${item.subcategory}` : ''}
-                           </span>
+          <div className="space-y-8">
+            {Object.entries(groupedItems).map(([category, categoryItems]) => (
+              <div key={category} className="space-y-3">
+                <div className="flex items-center space-x-2 px-1">
+                   <div className={`p-1.5 rounded-lg border ${getCategoryColor(category)}`}>
+                      {getCategoryIcon(category)}
+                   </div>
+                   <h4 className="text-xs font-black uppercase tracking-widest text-gray-400">
+                      {category}
+                   </h4>
+                </div>
+                
+                {categoryItems.map((item) => (
+                  <motion.div 
+                    key={item.originalIndex}
+                    layout
+                    className={`p-4 rounded-2xl border transition-all ${
+                      selectedItems.has(item.originalIndex) 
+                        ? `bg-white border-blue-100 shadow-sm` 
+                        : 'bg-gray-50 border-transparent opacity-60'
+                    }`}
+                  >
+                    <div className="flex items-start justify-between">
+                      <div className="flex space-x-3 flex-1">
+                        <button 
+                          onClick={() => toggleItem(item.originalIndex)}
+                          className={`mt-0.5 w-5 h-5 rounded-md flex items-center justify-center transition-colors ${
+                            selectedItems.has(item.originalIndex) ? 'bg-blue-600 text-white' : 'border-2 border-gray-200'
+                          }`}
+                        >
+                          {selectedItems.has(item.originalIndex) && <Check size={14} />}
+                        </button>
+                        <div className="flex-1 min-w-0">
+                          <input 
+                            value={item.name}
+                            onChange={(e) => updateItem(item.originalIndex, 'name', e.target.value)}
+                            className={`w-full font-bold text-sm bg-transparent border-none p-0 focus:ring-0 focus:outline-none transition-colors ${
+                               selectedItems.has(item.originalIndex) ? 'text-gray-900' : 'text-gray-400'
+                            }`}
+                            placeholder="Item name"
+                          />
+                          <p className="text-[10px] text-gray-400 font-medium mt-0.5">
+                             {item.subcategory || 'Individual Item'}
+                          </p>
                         </div>
                       </div>
+                      <div className="text-right ml-4">
+                         <div className="flex items-center border-b border-gray-100 focus-within:border-blue-300 transition-colors">
+                            <span className="text-sm font-bold text-gray-400 mr-1">£</span>
+                            <input 
+                              type="number"
+                              step="0.01"
+                              value={item.price}
+                              onChange={(e) => updateItem(item.originalIndex, 'price', e.target.value)}
+                              className="w-16 text-right font-bold text-sm bg-transparent border-none p-0 focus:ring-0 focus:outline-none"
+                            />
+                         </div>
+                         <button 
+                            onClick={() => removeItem(item.originalIndex)}
+                            className="mt-2 p-1 text-gray-300 hover:text-red-400 transition-colors"
+                         >
+                            <Trash2 size={14} />
+                         </button>
+                      </div>
                     </div>
-                  </div>
-                  <div className="text-right ml-4">
-                     <div className="flex items-center border-b border-gray-100 focus-within:border-blue-300 transition-colors">
-                        <span className="text-sm font-bold text-gray-400 mr-1">£</span>
-                        <input 
-                          type="number"
-                          step="0.01"
-                          value={item.price}
-                          onChange={(e) => updateItem(index, 'price', e.target.value)}
-                          className="w-16 text-right font-bold text-sm bg-transparent border-none p-0 focus:ring-0 focus:outline-none"
-                        />
-                     </div>
-                     <button 
-                        onClick={() => removeItem(index)}
-                        className="mt-2 p-1 text-gray-300 hover:text-red-400 transition-colors"
-                     >
-                        <Trash2 size={14} />
-                     </button>
-                  </div>
-                </div>
-              </motion.div>
+                  </motion.div>
+                ))}
+              </div>
             ))}
           </div>
         </section>

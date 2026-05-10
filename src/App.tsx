@@ -36,7 +36,8 @@ import {
   Loader2,
   AlertCircle,
   CheckCircle2,
-  Receipt
+  Receipt,
+  FileText
 } from 'lucide-react';
 
 import { auth, db, handleFirestoreError, OperationType } from './lib/firebase';
@@ -44,7 +45,9 @@ import BottomNav from './components/BottomNav';
 import CameraScanner from './components/CameraScanner';
 import ReceiptReview from './components/ReceiptReview';
 import HouseholdManager from './components/HouseholdManager';
-import { processReceiptImage, ScannedExpense } from './services/geminiService';
+import StatementUploader from './components/StatementUploader';
+import ReconciliationView from './components/ReconciliationView';
+import { processReceiptImage, ScannedExpense, processBankStatement, StatementAnalysis } from './services/geminiService';
 
 export default function App() {
   const [user, setUser] = useState<User | null>(null);
@@ -53,10 +56,31 @@ export default function App() {
   const [activeTab, setActiveTab] = useState('home');
   const [isScanning, setIsScanning] = useState(false);
   const [isProcessing, setIsProcessing] = useState(false);
+  const [processingType, setProcessingType] = useState<'receipt' | 'statement'>('receipt');
   const [pendingExpense, setPendingExpense] = useState<ScannedExpense | null>(null);
+  const [pendingStatement, setPendingStatement] = useState<StatementAnalysis | null>(null);
+  const [isUploadingStatement, setIsUploadingStatement] = useState(false);
   const [expenses, setExpenses] = useState<any[]>([]);
+  const [bankTransactions, setBankTransactions] = useState<any[]>([]);
   const [monthlyBudget, setMonthlyBudget] = useState(1000);
   const [currency, setCurrency] = useState('GBP');
+
+  // Load Bank Transactions
+  useEffect(() => {
+    if (!user || !userData) return;
+    
+    const q = query(
+      collection(db, 'bank_transactions'),
+      where('userId', '==', user.uid),
+      orderBy('date', 'desc')
+    );
+
+    const unsubscribe = onSnapshot(q, (snapshot) => {
+      const txs = snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() }));
+      setBankTransactions(txs);
+    }, (err) => handleFirestoreError(err, OperationType.LIST, 'bank_transactions'));
+    return unsubscribe;
+  }, [user, userData]);
 
   // Load Auth State and link Households
   useEffect(() => {
@@ -161,9 +185,18 @@ export default function App() {
 
   const handleCapture = async (imageData: string) => {
     setIsScanning(false);
+    setProcessingType('receipt');
     setIsProcessing(true);
     try {
       const result = await processReceiptImage(imageData);
+      
+      if (!result.isReceipt) {
+        alert("This doesn't look like a valid receipt. Please make sure the items and total are clear.");
+        setIsProcessing(false);
+        setIsScanning(true); // Re-open scanner
+        return;
+      }
+
       setPendingExpense(result);
     } catch (error) {
       console.error("Scanning failed", error);
@@ -192,6 +225,48 @@ export default function App() {
     } catch (error) {
       console.error("Save failed", error);
       alert("Failed to save expense.");
+    }
+  };
+
+  const saveStatement = async (analysis: StatementAnalysis) => {
+    setProcessingType('statement');
+    setIsProcessing(true);
+    setIsUploadingStatement(false);
+    try {
+      const statementRef = await addDoc(collection(db, 'statements'), {
+        userId: user?.uid,
+        householdId: userData?.householdId || null,
+        startDate: analysis.startDate || '',
+        endDate: analysis.endDate || '',
+        totalDebit: analysis.totalDebit || 0,
+        totalCredit: analysis.totalCredit || 0,
+        createdAt: Timestamp.now().toDate().toISOString()
+      });
+
+      // Save transactions and attempt auto-link
+      for (const tx of analysis.transactions) {
+        // Try to find a matching receipt in expenses
+        const match = expenses.find(e => 
+          Math.abs(parseFloat(e.amount) - tx.amount) < 0.05 && 
+          tx.merchant.toLowerCase().includes(e.merchant.split(' ')[0].toLowerCase())
+        );
+
+        await addDoc(collection(db, 'bank_transactions'), {
+          ...tx,
+          userId: user?.uid,
+          householdId: userData?.householdId || null,
+          statementId: statementRef.id,
+          isLinkedToReceipt: !!match,
+          linkedReceiptId: match ? match.id : null
+        });
+      }
+      setPendingStatement(null);
+      setActiveTab('reconcile');
+    } catch (err) {
+      console.error(err);
+      alert("Failed to save statement.");
+    } finally {
+      setIsProcessing(false);
     }
   };
 
@@ -392,6 +467,32 @@ export default function App() {
              </motion.div>
           )}
           
+          {activeTab === 'reconcile' && (
+             <motion.div
+                key="reconcile"
+                initial={{ opacity: 0 }}
+                animate={{ opacity: 1 }}
+             >
+                <div className="mb-6">
+                   <button 
+                      onClick={() => setIsUploadingStatement(true)}
+                      className="w-full py-4 bg-white border border-gray-100 rounded-3xl flex items-center justify-center space-x-3 shadow-sm hover:shadow-md transition-all active:scale-95"
+                   >
+                      <div className="p-2 bg-blue-50 rounded-xl text-blue-600">
+                         <FileText size={18} />
+                      </div>
+                      <span className="font-bold text-sm text-gray-700">Upload Bank Statement</span>
+                   </button>
+                </div>
+                
+                <ReconciliationView 
+                   transactions={bankTransactions}
+                   expenses={expenses}
+                   currency={currency}
+                />
+             </motion.div>
+          )}
+
           {activeTab === 'settings' && (
              <motion.div
                 key="settings"
@@ -463,6 +564,15 @@ export default function App() {
         )}
       </AnimatePresence>
 
+      <AnimatePresence>
+        {isUploadingStatement && (
+          <StatementUploader 
+            onAnalysisComplete={saveStatement}
+            onClose={() => setIsUploadingStatement(false)}
+          />
+        )}
+      </AnimatePresence>
+
       {/* AI Processing Overlay */}
       <AnimatePresence>
         {isProcessing && (
@@ -482,9 +592,13 @@ export default function App() {
                   <Wallet className="text-blue-600" size={32} />
                </div>
              </div>
-             <h2 className="text-2xl font-bold text-gray-900 mb-2">Analyzing Receipt</h2>
-             <p className="text-gray-500 max-w-xs">
-                Our AI is extracting the details of your purchase. This only takes a moment.
+             <h2 className="text-2xl font-black text-gray-900 mb-2">
+                {processingType === 'receipt' ? "Processing Receipt" : "Analyzing Statement"}
+             </h2>
+             <p className="text-gray-500 max-w-xs font-medium">
+                {processingType === 'receipt' 
+                  ? "Identifying every item, price, and category automatically..."
+                  : "Cross-referencing transactions with your budget history..."}
              </p>
              
              {/* Staggered progress dots */}
