@@ -1,0 +1,76 @@
+{
+  "entities": {
+    "User": {
+      "title": "User Profile",
+      "description": "Store user preferences and high-level budget settings.",
+      "type": "object",
+      "properties": {
+        "uid": { "type": "string" },
+        "email": { "type": "string" },
+        "displayName": { "type": "string" },
+        "monthlyBudget": { "type": "number", "description": "Total monthly spending limit." },
+        "currency": { "type": "string", "enum": ["USD", "EUR", "GBP", "INR"], "description": "Preferred currency." },
+        "householdId": { "type": "string", "description": "ID of the shared household room." }
+      },
+      "required": ["uid", "email"]
+    },
+    "Household": {
+      "title": "Shared Household",
+      "description": "A shared room for collaborative expense tracking.",
+      "type": "object",
+      "properties": {
+        "name": { "type": "string" },
+        "members": { "type": "array", "items": { "type": "string" } },
+        "memberEmails": { "type": "array", "items": { "type": "string" } },
+        "createdBy": { "type": "string" }
+      },
+      "required": ["name", "members"]
+    },
+    "Expense": {
+      "title": "Expense Entry",
+      "description": "An individual transaction recorded via scan or manual entry.",
+      "type": "object",
+      "properties": {
+        "userId": { "type": "string" },
+        "householdId": { "type": "string", "description": "Link to shared household if applicable." },
+        "amount": { "type": "number" },
+        "merchant": { "type": "string" },
+        "date": { "type": "string", "format": "date-time" },
+        "category": { "type": "string", "description": "Category like 'Grocery', 'Transport', etc." },
+        "status": { "type": "string", "enum": ["pending", "verified"], "description": "Verification status of AI OCR." },
+        "rawOcrData": { "type": "string", "description": "Full text extracted from receipt." },
+        "imageUrl": { "type": "string", "description": "Firebase Storage link to receipt image (optional)." }
+      },
+      "required": ["userId", "amount", "merchant", "date", "category"]
+    },
+    "Category": {
+      "title": "Expense Category",
+      "description": "Custom or system categories for grouping expenses.",
+      "type": "object",
+      "properties": {
+        "name": { "type": "string" },
+        "icon": { "type": "string", "description": "Lucide icon name." },
+        "userId": { "type": "string", "description": "Owner of the custom category. Null for system defaults." }
+      },
+      "required": ["name"]
+    }
+  },
+  "firestore": {
+    "users/{userId}": {
+      "schema": "User",
+      "description": "User profile and budget settings."
+    },
+    "households/{householdId}": {
+      "schema": "Household",
+      "description": "Shared household groups."
+    },
+    "expenses": {
+      "schema": "Expense",
+      "description": "Collection of all expenses across all users."
+    },
+    "categories": {
+      "schema": "Category",
+      "description": "Master list of categories."
+    }
+  }
+}

@@ -1,0 +1,6 @@
+{
+  "name": "SmartSpend AI",
+  "description": "Smart expense tracking with AI receipt scanning, auto-categorization, and budget planning.",
+  "requestFramePermissions": ["camera"],
+  "majorCapabilities": ["AI-powered OCR", "Budget Analytics", "Cloud Sync"]
+}
